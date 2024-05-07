@@ -117,6 +117,9 @@ def main(args):
     for line in tqdm(data):
         doc_ents = list(map(process_entity, extract_entities(line['input_doc'])))
         summary_ents = list(map(process_entity, extract_entities(line['summary'])))
+        if args.lower:
+            doc_ents = [x.lower() for x in doc_ents]
+            summary_ents = [x.lower() for x in summary_ents]
         signal = list(set(doc_ents).intersection(set(summary_ents)))
         signals.append({
             'doc_named_entities': doc_ents,
