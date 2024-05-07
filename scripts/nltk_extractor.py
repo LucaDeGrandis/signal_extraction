@@ -1,6 +1,7 @@
 from typing import List, Any, Dict
 import argparse
 
+from tqdm import tqdm
 import json
 import os
 
@@ -94,7 +95,7 @@ def write_jsonl_file(
 def main(args):
     data = load_jsonl_file(args.input_path)
     signals = []
-    for line in data:
+    for line in tqdm(data):
         doc_ents = extract_entities(line['input_doc'])
         summary_ents = extract_entities(line['summary'])
         signal = list(set(doc_ents).intersection(set(summary_ents)))
