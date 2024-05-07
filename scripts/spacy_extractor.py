@@ -6,7 +6,8 @@ import json
 import os
 
 import nltk
-import re
+import spacy
+from spacy import displacy
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 nltk.download('maxent_ne_chunker')
@@ -17,7 +18,7 @@ def extract_entities(
     text: str
 ) -> List[str]:
     """
-    Extracts named entities from the given text.
+    Extracts named entities from the given text using Spacy.
 
     Args:
         text (str): The input text from which named entities will be extracted.
@@ -29,20 +30,14 @@ def extract_entities(
         >>> extract_entities("Apple Inc. is a technology company.")
         ['Apple Inc.']
     """
-    # Tokenize the text into words
-    words = nltk.word_tokenize(text)
+    # Load the English language model
+    nlp = spacy.load("en_core_web_sm")
 
-    # Tag the words with their part-of-speech (POS) tags
-    tagged_words = nltk.pos_tag(words)
+    # Process the text with the language model
+    doc = nlp(text)
 
-    # Use the named entity chunker to extract named entities
-    chunked_words = nltk.ne_chunk(tagged_words)
-
-    # Extract the named entities from the chunked words
-    entities = []
-    for chunk in chunked_words:
-        if hasattr(chunk, 'label'):
-            entities.append(' '.join(c[0] for c in chunk))
+    # Extract the named entities from the processed text
+    entities = [ent.text for ent in doc.ents]
 
     return entities
 
@@ -52,7 +47,6 @@ def argparser() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Extract named entities from text.')
     parser.add_argument('--input_path', type=str, help='The file containing documents and summaries. The file must be a JSONL file (list of dictionaries) with keys "input_doc" for documents and "summary" for summaries.')
     parser.add_argument('--output_path', type=str, help='Where to save the signals. Signals are formatted as a JSONL file. Each dictionary has keys "doc_named_entities", "summary_named_entities", and "signal".')
-    parser.add_argument('--lower', action='store_true', help='Whether to make entities lower cased.')
     return parser.parse_args()
 
 
@@ -94,29 +88,12 @@ def write_jsonl_file(
             writer.write(json.dumps(line) + '\n')
 
 
-def process_entity(
-    entity: str
-) -> str:
-    """Postprocess the entities."""
-    pattern = r'\s*([A-Za-z])\.\s*([A-Za-z])'
-    matches = re.finditer(pattern, entity)
-    positions = [match.start() for match in matches]
-    positions = [x+1 for x in positions]
-    positions = [-1] + positions + [len(entity)]
-    splitted_str = []
-    for i in range(1, len(positions)):
-        pos_start = positions[i-1] + 1
-        pos_end = positions[i]
-        splitted_str.append(entity[pos_start:pos_end])
-    return '. '.join(splitted_str)
-
-
 def main(args):
     data = load_jsonl_file(args.input_path)
     signals = []
     for line in tqdm(data):
-        doc_ents = list(map(process_entity, extract_entities(line['input_doc'])))
-        summary_ents = list(map(process_entity, extract_entities(line['summary'])))
+        doc_ents = extract_entities(line['input_doc'])
+        summary_ents = extract_entities(line['summary'])
         signal = list(set(doc_ents).intersection(set(summary_ents)))
         signals.append({
             'doc_named_entities': doc_ents,
