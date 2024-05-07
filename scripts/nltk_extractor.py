@@ -45,12 +45,12 @@ def extract_entities(
     return entities
 
 
-def argparser():
+def argparser() -> argparse.Namespace:
     """Argument parser"""
     parser = argparse.ArgumentParser(description='Extract named entities from text.')
     parser.add_argument('--input_path', type=str, help='The file containing documents and summaries. The file must be a JSONL file (list of dictionaries) with keys "input_doc" for documents and "summary" for summaries.')
     parser.add_argument('--output_path', type=str, help='Where to save the signals. Signals are formatted as a JSONL file. Each dictionary has keys "doc_named_entities", "summary_named_entities", and "signal".')
-    return parser.parse()
+    return parser.parse_args()
 
 
 def load_jsonl_file(
