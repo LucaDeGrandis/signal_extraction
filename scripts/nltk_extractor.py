@@ -98,7 +98,7 @@ def process_entity(
     entity: str
 ) -> str:
     """Postprocess the entities."""
-    pattern = r'\s*([A-Za-z])\.\s*([A-Za-z])'
+    pattern = r'([A-Za-z])\.([A-Za-z])'
     matches = re.finditer(pattern, entity)
     positions = [match.start() for match in matches]
     positions = [x+1 for x in positions]
