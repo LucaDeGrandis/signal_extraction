@@ -51,6 +51,7 @@ def argparser() -> argparse.Namespace:
     parser.add_argument('--input_path', type=str, help='The file containing documents and summaries. The file must be a JSONL file (list of dictionaries) with keys "input_doc" for documents and "summary" for summaries.')
     parser.add_argument('--output_path', type=str, help='Where to save the signals. Signals are formatted as a JSONL file. Each dictionary has keys "doc_named_entities", "summary_named_entities", and "signal".')
     parser.add_argument('--lower', action='store_true', help='Whether to make entities lower cased.')
+    parser.add_argument('--double_check', action='store_true', help='Include named entities if they are identified in the summary and manually found in the document or vice versa.')
     parser.add_argument('--type', default='entity', type=str, help='Possible values are "entity" and "noun_phrase".')
     return parser.parse_args()
 
@@ -120,6 +121,15 @@ def main(args):
             doc_ents = [x.lower() for x in doc_ents]
             summary_ents = [x.lower() for x in summary_ents]
         signal = list(set(doc_ents).intersection(set(summary_ents)))
+        if args.double_check:
+            for entity in doc_ents:
+                if entity not in signal and entity.lower() in line['summary'].lower():
+                    signal.append(entity)
+            for entity in summary_ents:
+                if entity not in signal and entity.lower() in line['input_doc'].lower():
+                    signal.append(entity)
+            signal = list(set(signal))
+        signal = sorted(signal, key=lambda x: line['summary'].lower().index(x.lower()))
         signals.append({
             'doc_named_entities': doc_ents,
             'summary_named_entities': summary_ents,
