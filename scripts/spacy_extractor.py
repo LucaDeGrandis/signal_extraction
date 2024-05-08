@@ -57,7 +57,10 @@ def extract_entities(
                 new_entities.append(entity)
         entities = new_entities
 
-    return entities
+    # Find positions of named entities from the Doc
+    positions = [text.index(x) for x in entities]
+
+    return entities, positions
 
 
 def argparser() -> argparse.Namespace:
@@ -131,21 +134,30 @@ def main(args):
     data = load_jsonl_file(args.input_path)
     signals = []
     for line in tqdm(data):
-        doc_ents = list(map(process_entity, extract_entities(line['input_doc'])))
-        summary_ents = list(map(process_entity, extract_entities(line['summary'])))
+        doc_ents, doc_ents_positions = extract_entities(line['input_doc'], filter_nouns=args.nouns_only)
+        summary_ents, summary_ents_positions = extract_entities(line['summary'], filter_nouns=args.nouns_only)
+        doc_ents = list(map(process_entity, doc_ents))
+        summary_ents = list(map(process_entity, summary_ents))
         if args.lower:
             doc_ents = [x.lower() for x in doc_ents]
             summary_ents = [x.lower() for x in summary_ents]
-        signal = list(set(doc_ents).intersection(set(summary_ents)))
+        signal = []
+        signal_pos = []
+        for _ent, _pos in zip(summary_ents, summary_ents_positions):
+            if _ent in doc_ents:
+                signal.append(_ent)
+                signal_pos.append(_pos)
         if args.double_check:
-            for entity in doc_ents:
-                if entity not in signal and entity.lower() in line['summary'].lower():
-                    signal.append(entity)
-            for entity in summary_ents:
-                if entity not in signal and entity.lower() in line['input_doc'].lower():
-                    signal.append(entity)
-            signal = list(set(signal))
-        signal = sorted(signal, key=lambda x: line['summary'].lower().index(x.lower()))
+            for _ent, _pos in zip(doc_ents, doc_ents_positions):
+                if _ent not in signal and _ent.lower() in line['summary'].lower():
+                    signal.append(_ent)
+                    signal_pos.append(line['summary'].lower().index(_ent.lower()))
+            for _ent, _pos in zip(summary_ents, summary_ents_positions):
+                if _ent not in signal and _ent.lower() in line['input_doc'].lower():
+                    signal.append(_ent)
+                    signal_pos.append(_pos)
+        
+        signal = [x[0] for x in sorted(zip(signal, signal_pos), key=lambda x: x[1])]
         signals.append({
             'doc_named_entities': doc_ents,
             'summary_named_entities': summary_ents,
