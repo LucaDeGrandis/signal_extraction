@@ -2,6 +2,7 @@ from typing import List, Any, Dict
 import argparse
 
 from tqdm import tqdm
+from collections import defaultdict
 import json
 import os
 
@@ -10,7 +11,8 @@ import spacy
 
 
 def extract_entities(
-    text: str
+    text: str,
+    filter_nouns: bool = False
 ) -> List[str]:
     """
     Extracts named entities from the given text using Spacy.
@@ -42,6 +44,19 @@ def extract_entities(
     else:
         raise ValueError(f'Invalid entity type: {args.type}')
 
+    # Filter nouns
+    if filter_nouns:
+        ent2tag = defaultdict(list)
+        for token in doc:
+            ent2tag[token.text].append(token.tag_)
+        ent2noun = {ent: any('NN' in tag for tag in tags) for ent, tags in ent2tag.items()}
+        new_entities = []
+        for entity in entities:
+            entity_list = entity.split()
+            if any([ent2noun[token] for token in entity_list if token in ent2noun]):
+                new_entities.append(entity)
+        entities = new_entities
+
     return entities
 
 
@@ -52,6 +67,7 @@ def argparser() -> argparse.Namespace:
     parser.add_argument('--output_path', type=str, help='Where to save the signals. Signals are formatted as a JSONL file. Each dictionary has keys "doc_named_entities", "summary_named_entities", and "signal".')
     parser.add_argument('--lower', action='store_true', help='Whether to make entities lower cased.')
     parser.add_argument('--double_check', action='store_true', help='Include named entities if they are identified in the summary and manually found in the document or vice versa.')
+    parser.add_argument('--nouns_only', action='store_true', help='Only keeps entities if they have nouns in the text.')
     parser.add_argument('--type', default='entity', type=str, help='Possible values are "entity" and "noun_phrase".')
     return parser.parse_args()
 
