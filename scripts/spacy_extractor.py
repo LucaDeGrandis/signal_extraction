@@ -158,6 +158,13 @@ def main(args):
                     signal_pos.append(_pos)
         
         signal = [x[0] for x in sorted(zip(signal, signal_pos), key=lambda x: x[1])]
+
+        new_signal = []
+        for ent in signal:
+            if ent not in new_signal:
+                if not any([ent in x for x in signal if ent!=x]):
+                    new_signal.append(ent)
+
         signals.append({
             'doc_named_entities': doc_ents,
             'summary_named_entities': summary_ents,
