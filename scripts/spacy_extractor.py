@@ -32,7 +32,7 @@ def extract_entities(
         ['Apple Inc.']
     """
     # Load the Spacy English model
-    nlp = spacy.load('en_core_web_sm')
+    # nlp = spacy.load('en_core_web_sm')
 
     # Create a Spacy Doc object from the text
     doc = nlp(text)
@@ -178,36 +178,22 @@ def extract_entities_from_single_document(
     }
 
 
+def split_list(input_list, x):
+    return [input_list[i:i + min(x, len(input_list) - i)] for i in range(0, len(input_list), x)]
+
+
 def main(args):
     data = load_jsonl_file(args.input_path)
     raw_signals = []
 
-    process_input = [(i, line) for i, line in enumerate(data)]
-    inputs = (x for x in process_input)
+    # Load spacy
+    nlp = spacy.load('en_core_web_sm')  # We load it here because loading inside the function every time takes too much
 
-    def process_input():
-        try:
-            input = next(inputs)
-            signal_dict = extract_entities_from_single_document(input[1], args)
-            return [input[0], signal_dict]
-        except:
-            return [None, 'ERROR']
+    for line in tqdm(data):
+        signal_dict = extract_entities_from_single_document(line, args)
+        raw_signals.append(signal_dict)
 
-    pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
-    futures = [pool.submit(process_input) for _ in range(8)]
-
-    for res in tqdm(concurrent.futures.as_completed(futures)):  # Iterate over futures as they complete
-        res = res.result()
-        raw_signals.append(res)
-
-    raw_signals = list(filter(lambda x: x[0] is not None, raw_signals))
-    processed_indices = [x[0] for x in raw_signals]
-    total_indices = list(range(len(data)))
-    assert set(processed_indices) == set(total_indices)
-
-    signals = [x[1] for x in raw_signals]
-
-    write_jsonl_file(args.output_path, signals, overwrite=True)
+    write_jsonl_file(args.output_path, raw_signals, overwrite=True)
 
 
 if __name__ == '__main__':
