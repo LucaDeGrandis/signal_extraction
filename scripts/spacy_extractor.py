@@ -8,6 +8,7 @@ import os
 
 import re
 import spacy
+import copy
 
 
 def extract_entities(
