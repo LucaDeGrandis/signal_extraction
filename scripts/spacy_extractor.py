@@ -196,13 +196,13 @@ def main(args):
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
     futures = [pool.submit(process_input) for _ in range(8)]
 
-    for res in concurrent.futures.as_completed(futures):  # Iterate over futures as they complete
+    for res in tqdm(concurrent.futures.as_completed(futures)):  # Iterate over futures as they complete
         res = res.result()
         raw_signals.append(res)
 
-    raw_signals = list(filter(lambda x: x[0] is not None))
+    raw_signals = list(filter(lambda x: x[0] is not None, raw_signals))
     processed_indices = [x[0] for x in raw_signals]
-    total_indices = list(range(len(data))
+    total_indices = list(range(len(data)))
     assert set(processed_indices) == set(total_indices)
 
     signals = [x[1] for x in raw_signals]
