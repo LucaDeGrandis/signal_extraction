@@ -16,7 +16,8 @@ import concurrent
 
 def extract_entities(
     text: str,
-    filter_nouns: bool = False
+    nlp,
+    filter_nouns: bool = False,
 ) -> List[str]:
     """
     Extracts named entities from the given text using Spacy.
@@ -138,10 +139,11 @@ def process_entity(
 
 def extract_entities_from_single_document(
     line,
-    args
+    nlp,
+    args,
 ):
-    doc_ents, doc_ents_positions = extract_entities(line['input_doc'], filter_nouns=args.nouns_only)
-    summary_ents, summary_ents_positions = extract_entities(line['summary'], filter_nouns=args.nouns_only)
+    doc_ents, doc_ents_positions = extract_entities(line['input_doc'], filter_nouns=args.nouns_only, nlp=nlp)
+    summary_ents, summary_ents_positions = extract_entities(line['summary'], filter_nouns=args.nouns_only, nlp=nlp)
     doc_ents = list(map(process_entity, doc_ents))
     summary_ents = list(map(process_entity, summary_ents))
     if args.lower:
@@ -190,7 +192,7 @@ def main(args):
     nlp = spacy.load('en_core_web_sm')  # We load it here because loading inside the function every time takes too much
 
     for line in tqdm(data):
-        signal_dict = extract_entities_from_single_document(line, args)
+        signal_dict = extract_entities_from_single_document(line, nlp, args)
         raw_signals.append(signal_dict)
 
     write_jsonl_file(args.output_path, raw_signals, overwrite=True)
