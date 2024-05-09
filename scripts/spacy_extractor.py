@@ -168,7 +168,7 @@ def main(args):
         signals.append({
             'doc_named_entities': doc_ents,
             'summary_named_entities': summary_ents,
-            'signal': signal
+            'signal': new_signal
         })
 
     write_jsonl_file(args.output_path, signals, overwrite=True)
