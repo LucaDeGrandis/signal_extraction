@@ -117,17 +117,20 @@ def process_entity(
     entity: str
 ) -> str:
     """Postprocess the entities."""
-    pattern = r'\s*([A-Za-z])\.\s*([A-Za-z])'
-    matches = re.finditer(pattern, entity)
-    positions = [match.start() for match in matches]
-    positions = [x+1 for x in positions]
-    positions = [-1] + positions + [len(entity)]
-    splitted_str = []
-    for i in range(1, len(positions)):
-        pos_start = positions[i-1] + 1
-        pos_end = positions[i]
-        splitted_str.append(entity[pos_start:pos_end])
-    return '. '.join(splitted_str)
+    pattern = r'([A-Za-z])\.([A-Za-z])'
+    new_entity = copy.deepcopy(entity)
+    counter = 0
+    while True:
+        matches = list(re.finditer(pattern, new_entity))
+        if not matches:
+            break
+        positions = [matches[0].start(), matches[0].end()]
+        beginning = new_entity[:positions[0]]
+        end = new_entity[positions[1]:]
+        mid = new_entity[positions[0]:positions[1]].replace('.', '. ')
+        new_entity = beginning + mid + end
+
+    return new_entity
 
 
 def main(args):
