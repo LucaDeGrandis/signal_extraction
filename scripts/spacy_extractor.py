@@ -10,6 +10,9 @@ import re
 import spacy
 import copy
 
+from multiprocessing import Pool
+import concurrent
+
 
 def extract_entities(
     text: str,
@@ -120,7 +123,6 @@ def process_entity(
     """Postprocess the entities."""
     pattern = r'([A-Za-z])\.([A-Za-z])'
     new_entity = copy.deepcopy(entity)
-    counter = 0
     while True:
         matches = list(re.finditer(pattern, new_entity))
         if not matches:
@@ -134,46 +136,76 @@ def process_entity(
     return new_entity
 
 
-def main(args):
-    data = load_jsonl_file(args.input_path)
-    signals = []
-    for line in tqdm(data):
-        doc_ents, doc_ents_positions = extract_entities(line['input_doc'], filter_nouns=args.nouns_only)
-        summary_ents, summary_ents_positions = extract_entities(line['summary'], filter_nouns=args.nouns_only)
-        doc_ents = list(map(process_entity, doc_ents))
-        summary_ents = list(map(process_entity, summary_ents))
-        if args.lower:
-            doc_ents = [x.lower() for x in doc_ents]
-            summary_ents = [x.lower() for x in summary_ents]
-        signal = []
-        signal_pos = []
+def extract_entities_from_single_document(
+    line,
+    args
+):
+    doc_ents, doc_ents_positions = extract_entities(line['input_doc'], filter_nouns=args.nouns_only)
+    summary_ents, summary_ents_positions = extract_entities(line['summary'], filter_nouns=args.nouns_only)
+    doc_ents = list(map(process_entity, doc_ents))
+    summary_ents = list(map(process_entity, summary_ents))
+    if args.lower:
+        doc_ents = [x.lower() for x in doc_ents]
+        summary_ents = [x.lower() for x in summary_ents]
+    signal = []
+    signal_pos = []
+    for _ent, _pos in zip(summary_ents, summary_ents_positions):
+        if _ent in doc_ents:
+            signal.append(_ent)
+            signal_pos.append(_pos)
+    if args.double_check:
+        for _ent, _pos in zip(doc_ents, doc_ents_positions):
+            if _ent not in signal and _ent.lower() in line['summary'].lower():
+                signal.append(_ent)
+                signal_pos.append(line['summary'].lower().index(_ent.lower()))
         for _ent, _pos in zip(summary_ents, summary_ents_positions):
-            if _ent in doc_ents:
+            if _ent not in signal and _ent.lower() in line['input_doc'].lower():
                 signal.append(_ent)
                 signal_pos.append(_pos)
-        if args.double_check:
-            for _ent, _pos in zip(doc_ents, doc_ents_positions):
-                if _ent not in signal and _ent.lower() in line['summary'].lower():
-                    signal.append(_ent)
-                    signal_pos.append(line['summary'].lower().index(_ent.lower()))
-            for _ent, _pos in zip(summary_ents, summary_ents_positions):
-                if _ent not in signal and _ent.lower() in line['input_doc'].lower():
-                    signal.append(_ent)
-                    signal_pos.append(_pos)
-        
-        signal = [x[0] for x in sorted(zip(signal, signal_pos), key=lambda x: x[1])]
+    
+    signal = [x[0] for x in sorted(zip(signal, signal_pos), key=lambda x: x[1])]
 
-        new_signal = []
-        for ent in signal:
-            if ent not in new_signal:
-                if not any([ent in x for x in signal if ent!=x]):
-                    new_signal.append(ent)
+    new_signal = []
+    for ent in signal:
+        if ent not in new_signal:
+            if not any([ent in x for x in signal if ent!=x]):
+                new_signal.append(ent)
 
-        signals.append({
-            'doc_named_entities': doc_ents,
-            'summary_named_entities': summary_ents,
-            'signal': new_signal
-        })
+    return {
+        'doc_named_entities': doc_ents,
+        'summary_named_entities': summary_ents,
+        'signal': new_signal
+    }
+
+
+def main(args):
+    data = load_jsonl_file(args.input_path)
+    raw_signals = []
+
+    process_input = [(i, line) for i, line in enumerate(data)]
+    inputs = (x for x in process_input)
+
+    def process_input():
+        try:
+            input = next(inputs)
+            signal_dict = extract_entities_from_single_document(input[1], args)
+            return [input[0], signal_dict]
+        except:
+            return [None, 'ERROR']
+
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+    futures = [pool.submit(process_input) for _ in range(8)]
+
+    for res in concurrent.futures.as_completed(futures):  # Iterate over futures as they complete
+        res = res.result()
+        raw_signals.append(res)
+
+    raw_signals = list(filter(lambda x: x[0] is not None))
+    processed_indices = [x[0] for x in raw_signals]
+    total_indices = list(range(len(data))
+    assert set(processed_indices) == set(total_indices)
+
+    signals = [x[1] for x in raw_signals]
 
     write_jsonl_file(args.output_path, signals, overwrite=True)
 
